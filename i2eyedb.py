@@ -1,11 +1,184 @@
 # DB connection
 import psycopg2
-from psycopg2 import Error
+from psycopg2 import Error, extras
 import csv
 import json
 import requests
 
+from flask import Flask
+app = Flask(__name__)
 
+# Route for front end to send GET requests to retrieve all questions from the database in JSON format.
+@app.route('/get_questions', methods=["GET"])
+def get_all_questions():
+    try:
+        connection = connect_db()
+        cursor = connection.cursor()
+        cursor2 = connection.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+        cursor3 = connection.cursor()
+        postgres_select_query = """ SELECT station_id FROM station"""
+        cursor.execute(postgres_select_query)
+        connection.commit()
+        station_id_list = cursor.fetchall()
+        print(station_id_list)
+        results = {}
+        for i in station_id_list:
+            station_id, = i
+            postgres_select_query = """SELECT question_id, question, type_id FROM question WHERE station_id = {0}""".format(station_id)
+            postgres_select_query2 = """SELECT station_name FROM station WHERE station_id = {0}""".format(station_id)
+            cursor3.execute(postgres_select_query2)
+            station_name, = cursor3.fetchall()[0]
+            cursor2.execute(postgres_select_query)
+            connection.commit()
+            
+            results.update({station_name : cursor2.fetchall()})
+            # print(results)
+            print("Successful query of question table.")
+        return json.dumps(results)
+  
+      # ^ {"Registration": [
+      #     {"question_id": 1, "question": "Name", "type_id": 1}, 
+      #     {"question_id": 2, "question": "Gender", "type_id": 2}, 
+      #     {"question_id": 3, "question": "Age", "type_id": 3}, 
+      #     {"question_id": 4, "question": "Birthday", "type_id": 4}
+      #     ]
+      # }
+      
+    except (Exception, psycopg2.DatabaseError) as error :
+            print ("Error while getting question table and converting to JSON.", error)
+
+    finally:
+        #closing database connection.
+        if(connection):
+            cursor.close()
+            connection.close()
+            #print("PostgreSQL connection is closed")
+
+# get patient data from the patient id
+@app.route('/get_data', methods=["GET"])
+def get_patient_data(patient_id):
+    try:
+        connection = connect_db()
+        cursor = connection.cursor()
+        cursor2 = connection.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+        cursor3 = connection.cursor()
+        postgres_select_query = """ SELECT station_id FROM station"""
+        cursor.execute(postgres_select_query)
+        connection.commit()
+        station_id_list = cursor.fetchall()
+        #print(station_id_list)
+        results = {}
+        
+        for i in station_id_list:
+
+            station_id, = i
+            postgres_select_query = """SELECT question, answers FROM question INNER JOIN answer ON question.question_id = answer.question_id WHERE question.station_id = {0} AND answer.patient_id = {1}""".format(station_id, patient_id)
+            postgres_select_query2 = """SELECT station_name FROM station WHERE station_id = {0}""".format(station_id)
+            cursor3.execute(postgres_select_query2)
+            station_name, = cursor3.fetchall()[0]
+            cursor2.execute(postgres_select_query)
+            connection.commit()
+            
+            data = cursor2.fetchall()
+            data = [dict(row) for row in data]
+
+            num = 1
+            for j in data:
+                  #print(j)
+                  j['num'] = num
+                  num = num + 1
+
+            results.update({station_name : data})
+            
+        print("Successful query of question table.")
+        #print(results)
+
+        #{'Registration': [
+        #   {'question': 'Name', 'answers': 'ans', 'num': 1}, 
+        #   {'question': 'Gender', 'answers': 'ans2', 'num': 2}, 
+        #   {'question': 'Age', 'answers': 'ans3', 'num': 3}, 
+        #   {'question': 'Birthday', 'answers': 'ans4', 'num': 4}
+        #   ]
+        # }
+
+        return results
+  
+    except (Exception, psycopg2.DatabaseError) as error :
+            print ("Error while getting question table and converting to JSON.", error)
+
+    finally:
+        #closing database connection.
+        if(connection):
+            cursor.close()
+            connection.close()
+            #print("PostgreSQL connection is closed")
+
+# delete the patient's data (id and answers) from the database
+@app.route('/delete_patient', methods=["GET"])
+def delete_patient(patient_id):
+    try:
+        connection = connect_db()
+        cursor = connection.cursor()
+
+        # Delete patient
+        postgres_delete_patient_query = """DELETE FROM patient WHERE patient_id = {0}""".format(patient_id)
+        cursor.execute(postgres_delete_patient_query)
+        connection.commit()
+        print ("patient deleted from patient table")
+  
+        # Delete answer
+        postgres_delete_answer_query = """DELETE FROM answer WHERE patient_id = {0}""".format(patient_id)
+        cursor.execute(postgres_delete_answer_query)
+        connection.commit()
+        print ("patient answers deleted from answer table")
+
+    except (Exception, psycopg2.DatabaseError) as error :
+            print ("Error while deleting patient", error)
+
+    finally:
+        #closing database connection.
+        if(connection):
+            cursor.close()
+            connection.close()
+            #print("PostgreSQL connection is closed")
+
+@app.route('/get_availability', methods=["GET"])
+def get_station_availability():
+    try:
+        connection = connect_db()
+        cursor = connection.cursor()
+            
+        postgres_select_query = """SELECT station_name, availability FROM station"""
+        cursor.execute(postgres_select_query)
+        connection.commit()
+
+        results = cursor.fetchall()
+        results = dict(results)
+        
+        print("Successful query of station table.")
+        print(results)
+
+        # {'Tobacco Questionnare': True, 
+        # 'Anemia Questionnare': True, 
+        # 'BMI (Underweight measurement)': True, 
+        # 'Haemoglobin (Anemia measurement)': True, 
+        # 'Post campaign survey': True, 
+        # 'Registration': False}
+
+        return results
+      
+    except (Exception, psycopg2.DatabaseError) as error :
+            print ("Error while getting question table and converting to JSON.", error)
+
+    finally:
+        #closing database connection.
+        if(connection):
+            cursor.close()
+            connection.close()
+            #print("PostgreSQL connection is closed")
+
+# Use localhost for local database (with the default password set for your system). For now, I think we should
+# continue using the postgres db on heroku so that everyone can perform queries on it. - Wei Kit
 # This one i'm not v sure how to connect to a local db, so i've connected to another one i've deployed on heroku, can i get some help here?
 def connect_db():
         connection = psycopg2.connect(user = "jhfdzctgeytrkt",
@@ -23,7 +196,8 @@ def create_station():
 
             create_stations_table_query = '''CREATE TABLE IF NOT EXISTS station
                   (station_id SERIAL PRIMARY KEY,
-                  station_name TEXT UNIQUE); '''
+                  station_name TEXT UNIQUE,
+                  availability BOOLEAN); '''
             cursor.execute(create_stations_table_query)
             connection.commit()
             print("Table station created successfully in PostgreSQL ")
@@ -149,7 +323,7 @@ def insert_station(station_name):
       try:
             connection = connect_db()
             cursor = connection.cursor()
-            postgres_insert_query = """ INSERT INTO station (station_id, station_name) VALUES (DEFAULT, %s)"""
+            postgres_insert_query = """ INSERT INTO station (station_id, station_name, availability) VALUES (DEFAULT, %s, TRUE)"""
             record_to_insert = (station_name,)
             cursor.execute(postgres_insert_query, record_to_insert)
             connection.commit()
@@ -289,6 +463,7 @@ def read_questions(file):
                   questions.append(question[0])
       return questions
 
+# I'm not sure how to handle this too, I guess we have to standardize a format for the excel questions - Rollie
 # Insert questions from excel file into question table (I'm not v sure what to insert for the type, do we manually insert since there's not really a pattern?)
 def save_questions(file):
       questions = read_questions(file)
@@ -374,6 +549,48 @@ def get_answers(patient_id, station_id):
                 connection.close()
                 #print("PostgreSQL connection is closed")
 
+# set availability of station to false
+def set_availability_false(station_name):
+      try:
+            connection = connect_db()
+            cursor = connection.cursor()
+
+            postgres_select_query = """ UPDATE station SET availability = %s WHERE station_name = %s"""
+            record_to_select = (False, station_name,)
+            cursor.execute(postgres_select_query, record_to_select)
+            connection.commit()
+            print("Availability set to false")
+
+      except (Exception, psycopg2.Error) as error :
+            if(connection):
+                print("Failed to insert record into station table", error)
+      finally:
+            if(connection):
+                cursor.close()
+                connection.close()
+                #print("PostgreSQL connection is closed")
+
+# set availability of station to true
+def set_availability_true(station_name):
+      try:
+            connection = connect_db()
+            cursor = connection.cursor()
+
+            postgres_select_query = """ UPDATE station SET availability = %s WHERE station_name = %s"""
+            record_to_select = (True, station_name,)
+            cursor.execute(postgres_select_query, record_to_select)
+            connection.commit()
+            print("Availability set to true")
+
+      except (Exception, psycopg2.Error) as error :
+            if(connection):
+                print("Failed to insert record into station table", error)
+      finally:
+            if(connection):
+                cursor.close()
+                connection.close()
+                #print("PostgreSQL connection is closed")
+
 # Testing if info is inserted successfully
 def insert_stuff_test():
       insert_type("text")
@@ -392,14 +609,19 @@ def insert_stations():
       insert_station("Haemoglobin (Anemia measurement)")
       insert_station("Post campaign survey")
 
-def main():
-      db_setup()
+#def main():
+      #db_setup()
       #insert_stations()
       #save_questions("question.csv")
       #insert_stuff_test()
       #get_questions("Registration")
       #get_answers(1,1)
       #update_completed(1, "registration")
+      #set_availability_false("Registration")
+      #get_station_availability()
+
+#if __name__ == '__main__':    
+      #main()
 
 if __name__ == '__main__':
-    main()
+      app.run(debug=True)
