@@ -222,7 +222,7 @@ def get_all_patients():
 
 # 3.1: Get patient data from the patient id
 
-@app.route('/get_data/<int:patient_id>', methods=["POST"])
+@app.route('/get_data/<int:patient_id>', methods=["GET"])
 def get_patient_data(patient_id):
     try:
         connection = connect_db()
@@ -344,6 +344,7 @@ def delete_patient(patient_id):
         cursor.execute(postgres_delete_answer_query)
         connection.commit()
         print("patient answers deleted from answer table")
+        return "patient successfully deleted"
 
     except (Exception, psycopg2.DatabaseError) as error:
         print("Error while deleting patient", error)
@@ -397,16 +398,16 @@ def get_station_availability():
 
 
 def connect_db():
-    #   connection = psycopg2.connect(user = "jhfdzctgeytrkt",
-    #                       password = "6f0913d556bf6eee840e0e2ba8b4c0b3ef0331f6855852008be07eeb840cdb6f",
-    #                       host = "ec2-35-173-94-156.compute-1.amazonaws.com",
-    #                       port = "5432",
-    #                       database = "dbpduk6f0fbp8q")
-    connection = psycopg2.connect(user="postgres",
-                                  password="postgres",
-                                  host="localhost",
-                                  port="5432",
-                                  database="postgres")
+    connection = psycopg2.connect(user = "jhfdzctgeytrkt",
+                           password = "6f0913d556bf6eee840e0e2ba8b4c0b3ef0331f6855852008be07eeb840cdb6f",
+                           host = "ec2-35-173-94-156.compute-1.amazonaws.com",
+                           port = "5432",
+                           database = "dbpduk6f0fbp8q")
+    #connection = psycopg2.connect(user="postgres",
+    #                              password="postgres",
+    #                              host="localhost",
+    #                              port="5432",
+    #                              database="postgres")
     return connection
 
 # Create station table
@@ -928,4 +929,5 @@ def main():
 
 if __name__ == '__main__':
     # main()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
+    #app.run(debug=True)
