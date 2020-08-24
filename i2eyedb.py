@@ -338,6 +338,48 @@ def update_patient_data(patient_id):
             #print("PostgreSQL connection is closed")
 
 
+# insert patient data
+
+@app.route('/insert_patient_data/<int:patient_id>', methods=["POST"])
+def insert_patient_data(patient_id):
+    try:
+        connection = connect_db()
+
+        cursor = connection.cursor()
+
+        data = request.get_json()
+        for station in data.keys():
+            for json_question in data[station]:
+                  question = json_question['question']
+
+                  answer = json_question['answers']
+
+                  cursor2 = connection.cursor()
+                  station_id_query = """SELECT station_id FROM station WHERE station_name = %s"""
+                  station_to_get = (station,)
+                  cursor2.execute(station_id_query, station_to_get)
+                  station_id = cursor2.fetchall()[0]
+
+                  question_id_query = """SELECT question_id FROM question WHERE question = %s AND station_id = %s"""
+                  question_to_get = (question, station_id,)
+                  cursor2.execute(question_id_query, question_to_get)
+                  question_id = cursor2.fetchall()[0]
+
+                  print(question_id)
+
+                  insert_answer(patient_id, answer, question_id, station_id)
+
+        return "Data successfully inserted"
+
+    except (Exception, psycopg2.DatabaseError) as error:
+        print("Error while inserting data.", error)
+
+    finally:
+        # closing database connection.
+        if(connection):
+            cursor.close()
+            connection.close()
+            #print("PostgreSQL connection is closed")
 
 
 # 4: Delete the patient's data (id and answers) from the database
