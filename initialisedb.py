@@ -25,26 +25,21 @@ def submit_registration():
         num_of_stations = cursor.fetchall()[0][0]
         print(num_of_stations)
 
-        # initialise array with 0s of size = num_of_stations
-        completed_stations = [0] * num_of_stations
-
-        # Registration station is completed
-        completed_stations[0] = 2
-        insert_patient("true", completed_stations)
-
-        patient_id_query = """ SELECT patient_id from patient ORDER BY patient_id DESC LIMIT 1 """
+        patient_id_query = """ SELECT COUNT(*) from answer """
         cursor.execute(patient_id_query)
         connection.commit()
-        patient_id = cursor.fetchall()[0][0]
+        patient_id = cursor.fetchall()[0][0] + 1
         print(patient_id)
 
+      # initialise array with 0s of size = num_of_stations
+        completed_stations = [0] * num_of_stations
+
         data = request.get_json()
-        print(data)
-        registration_questions = data['Registration']
+        registration_questions = data['registration']
 
         for json_question in registration_questions:
             question = json_question['question']
-            answer = json_question['answers']
+            answer = json_question['answer']
 
             question_id_query = """SELECT question_id FROM question WHERE question = '{0}' """.format(
                 question)
@@ -57,9 +52,9 @@ def submit_registration():
 
             insert_answer(patient_id, answer, question_id, 1)
 
-        insert_blank_data(patient_id)
-        insert_blank_registration_data(patient_id)
-
+      # Registration station is completed
+        completed_stations[0] = 2
+        insert_patient("false", completed_stations)
         print("Successful submission of registration.")
         return str(patient_id)
 
@@ -147,7 +142,7 @@ def get_all_patients():
         connection = connect_db()
         cursor = connection.cursor()
         # Get all existing patient IDs in DB.
-        patient_select_query = """ SELECT patient_id FROM patient ORDER BY patient_id ASC"""
+        patient_select_query = """ SELECT patient_id FROM patient"""
         cursor.execute(patient_select_query)
         connection.commit()
         patient_ID_list = cursor.fetchall()
@@ -215,13 +210,6 @@ def get_all_patients():
 
                 # Append each station and the status to the list.
                 this_patient_data.update({station_name: outcome})
-
-            availability_query = """SELECT status from patient WHERE patient_id = {0}""".format(
-                id)
-            cursor.execute(availability_query)
-            connection.commit()
-            availability = cursor.fetchall()[0][0]
-            this_patient_data.update({"Is Available": availability})
 
             # Processing of this patient is done. Append to results.
             results.append(this_patient_data)
@@ -358,115 +346,6 @@ def update_patient_data(patient_id):
             #print("PostgreSQL connection is closed")
 
 
-# insert patient data
-
-# @app.route('/insert_patient_data/<int:patient_id>', methods=["POST"])
-# def insert_patient_data(patient_id):
-#     try:
-#         connection = connect_db()
-
-#         cursor = connection.cursor()
-
-#         data = request.get_json()
-#         for station in data.keys():
-#             for json_question in data[station]:
-#                 question = json_question['question']
-
-#                 answer = json_question['answers']
-
-#                 cursor2 = connection.cursor()
-#                 station_id_query = """SELECT station_id FROM station WHERE station_name = %s"""
-#                 station_to_get = (station,)
-#                 cursor2.execute(station_id_query, station_to_get)
-#                 station_id = cursor2.fetchall()[0]
-
-#                 question_id_query = """SELECT question_id FROM question WHERE question = %s AND station_id = %s"""
-#                 question_to_get = (question, station_id,)
-#                 cursor2.execute(question_id_query, question_to_get)
-#                 question_id = cursor2.fetchall()[0]
-
-#                 print(question_id)
-
-#                 insert_answer(patient_id, answer, question_id, station_id)
-
-#         return "Data successfully inserted"
-
-#     except (Exception, psycopg2.DatabaseError) as error:
-#         print("Error while inserting data.", error)
-
-#     finally:
-#         # closing database connection.
-#         if(connection):
-#             cursor.close()
-#             connection.close()
-#             #print("PostgreSQL connection is closed")
-
-def insert_blank_data(patient_id):
-    try:
-        connection = connect_db()
-
-        cursor = connection.cursor()
-
-        insert_blanks_query = """ INSERT INTO answer (question_id, station_id, answers, patient_id)
-                                  SELECT question_id, station_id, '', %s 
-                                  FROM question
-                                  WHERE station_id != 
-                                    (SELECT station_id 
-                                    FROM station
-                                    WHERE station_name = 'Registration');  """
-
-        patient_id_to_insert = (patient_id,)
-        cursor.execute(insert_blanks_query, patient_id_to_insert)
-        connection.commit()
-
-        print("Successful addition of blank answers")
-        return "Data successfully inserted"
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        print("Error while inserting blank data.", error)
-
-    finally:
-        # closing database connection.
-        if(connection):
-            cursor.close()
-            connection.close()
-            #print("PostgreSQL connection is closed")
-
-
-def insert_blank_registration_data(patient_id):
-    try:
-        connection = connect_db()
-
-        cursor = connection.cursor()
-
-        insert_blanks_query = """ INSERT INTO answer (question_id, station_id, answers, patient_id)
-                                  SELECT question_id, station_id, '', %s
-                                  FROM question
-                                  WHERE (question_id NOT IN 
-                                  (SELECT question_id 
-                                  FROM answer
-                                  WHERE (patient_id = %s)))
-                                  AND station_id = 
-                                    (SELECT station_id 
-                                    FROM station
-                                    WHERE station_name = 'Registration')  """
-
-        cursor.execute(insert_blanks_query, (patient_id, patient_id,))
-        connection.commit()
-
-        print("Successful addition of blank answers")
-        return "Data successfully inserted"
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        print("Error while inserting data.", error)
-
-    finally:
-        # closing database connection.
-        if(connection):
-            cursor.close()
-            connection.close()
-            #print("PostgreSQL connection is closed")
-
 # 4: Delete the patient's data (id and answers) from the database
 
 
@@ -563,107 +442,6 @@ def set_availability():
     except (Exception, psycopg2.Error) as error:
         if(connection):
             print("Failed to insert record into station table", error)
-    finally:
-        if(connection):
-            cursor.close()
-            connection.close()
-            #print("PostgreSQL connection is closed")
-
-
-# update status of patient
-
-@app.route('/update_patient_status', methods=["POST"])
-def update_patient_status():
-    try:
-        connection = connect_db()
-        cursor = connection.cursor()
-
-        data = request.get_json()
-        print(data)
-
-        for key, value in data.items():
-
-            if (key == "patient_id"):
-                patient_id = (value)
-
-            if (key == "boolean"):
-                patient_status = (value)
-
-            # print(key)
-            # print(value)
-
-        postgres_update_query = """ UPDATE patient SET status = %s WHERE patient_id = %s"""
-        record_to_update = (patient_status, patient_id,)
-        cursor.execute(postgres_update_query, record_to_update)
-        connection.commit()
-
-        print("ok")
-
-        return "Patient status updated"
-
-    except (Exception, psycopg2.Error) as error:
-        if(connection):
-            print("Failed to insert record into patient table", error)
-    finally:
-        if(connection):
-            cursor.close()
-            connection.close()
-            #print("PostgreSQL connection is closed")
-
-
-# update completed_stations of patient
-
-@app.route('/update_completed_stations/<int:patient_id>', methods=["POST"])
-def update_completed_stations(patient_id):
-    try:
-        connection = connect_db()
-        cursor = connection.cursor()
-        cursor2 = connection.cursor()
-
-        data = request.get_json()
-        print(data)
-
-        # initialise empty stations array
-        station_count_query = """ SELECT COUNT(*) from station """
-        cursor.execute(station_count_query)
-        connection.commit()
-        num_of_stations = cursor.fetchall()[0][0]
-        print(num_of_stations)
-
-        completed_stations = [0] * num_of_stations
-
-        for station_name, completion_info in data.items():
-            station_id_query = """SELECT station_id FROM station WHERE station_name = '{0}' """.format(
-                station_name)
-            cursor2.execute(station_id_query)
-            connection.commit()
-            station_id = cursor2.fetchall()[0][0]-1
-            print(station_id)
-
-            if completion_info == "Not Queued":
-                completed_stations[station_id] = 0
-            elif completion_info == "In Queue":
-                completed_stations[station_id] = 1
-            elif completion_info == "Completed":
-                completed_stations[station_id] = 2
-            else:
-                completed_stations[station_id] = -1
-
-            # print(key)
-            # print(value)
-
-        postgres_update_query = """ UPDATE patient SET completed_station = %s WHERE patient_id = %s"""
-        record_to_update = (completed_stations, patient_id,)
-        cursor.execute(postgres_update_query, record_to_update)
-        connection.commit()
-
-        print("ok")
-
-        return "Completed stations updated"
-
-    except (Exception, psycopg2.Error) as error:
-        if(connection):
-            print("Failed to insert record into patient table", error)
     finally:
         if(connection):
             cursor.close()
@@ -1166,11 +944,14 @@ def insert_stuff_test():
 
 def insert_stations():
     insert_station("Registration")
-    insert_station("Tobacco Questionnare")
-    insert_station("Anemia Questionnare")
-    insert_station("BMI (Underweight measurement)")
-    insert_station("Haemoglobin (Anemia measurement)")
-    insert_station("Post campaign survey")
+    insert_station("Oral Health")
+    insert_station("BMI")
+    insert_station("Eye Screening")
+    insert_station("Phlebotomy Test")
+    insert_station("Fingerstick Blood Test (Anemia)")
+    insert_station("Fingerstick Blood Test (RCBG)")
+    insert_station("Blood Pressure")
+    insert_station("Doctor's Consult")
 
 
 def insert_stuff_test_patch_4():
@@ -1179,28 +960,116 @@ def insert_stuff_test_patch_4():
     drop_tables()
     db_setup()
 
-    insert_patient('Busy', [1, 0])
-    insert_patient('Available', [0, 2])
-    insert_station('oralHealth')
-    insert_station('bmi')
-    insert_question('Name', 1, 1)
-    insert_question('Age', 1, 1)
+    # insert_patient('Busy', [1, 0])
+    # insert_patient('Available', [0, 2])
+    # insert_station('oralHealth')
+    # insert_station('bmi')
 
-    # for patient 1
-    insert_answer(1, 'Alice', 1, 1)
-    insert_answer(1, 20, 2, 1)
+    registration = ["Name",
+                    "NRIC No.",
+                    "Gender",
+                    "Birthdate",
+                    "Age",
+                    "Do you have tubercolosis?",
+                    "Do you live with someone with tubercolosis?",
+                    "If Y to living with someone with tubercolosis, was he/she diagnosed more than 4 months ago?",
+                    "Are you currently suffering from any of the following symptoms?",
+                    "Do you have any blood borne diseases",
+                    "If Y to having a blood borne disease, what Blood Borne Disease do you have?",
+                    "Any pre-exisitng medical conditions?",
+                    "What is your occupation?",
+                    "Monthly Household Income (INR) [total]",
+                    "How many people are there in the household (including yourself)?",
+                    "What is your highest education qualification?",
+                    "How often do you exercise or do strenuous activity (lifting heavy objects, farming, construction work)?",
+                    "How long do you exercise per session (in hours)?",
+                    "Do you know anyone in your family who has diabetes?",
+                    "If Y to knowing anyone in the family who has diabetes, how many family members have diabetes?",
+                    "Do you know anyone in your family who has anemia?",
+                    "If Y to knowing anyone in the family who has anemia, how many family members have anemia?",
+                    "Do you know anyone in your family who has oral cancer?",
+                    "If Y to knowing anyone in the family who has oral cancer, how many family members have oral cancer?",
+                    "Other pre-existing conditions of family members (if any)"]
 
-    # for patient 2
-    insert_answer(2, 'Bob', 1, 1)
-    insert_answer(2, 35, 2, 1)
+    oral_health = ["Dental ID",
+                   "Have you ever consumed in the past/present any form of intoxications e.g. tobacco beedit, cigarettes (include chewing/smoking)?",
+                   "If Y to having consumed, what do you consume?",
+                   "If Y to having consumed, how many pieces/sticks on average do you consume a day?",
+                   "If Y to having consumed, for how long have u been consuming?",
+                   "If Y to having consumed, why do u still consume?",
+                   "Are you still consuming?",
+                   "If N to consuming now, when did you stop consuming?",
+                   "If N to consuming now, why did you choose to stop?",
+                   "If Y to consuming now, have you tried quitting? (and if so, for how long?)",
+                   "If Y to having tried quitting, what made you consume again?"]
+
+    bmi = ["Height (m)", "Weight (kg)", "Waist circumference (cm)"]
+
+    eye_screening = ["SNC ID"]
+
+    phlebotomy = ["Are you 40 years old or above?",
+                  "Are you suffering from any of the following conditions?",
+                  "Vimta Registration No."]
+
+    fingerstick_anemia = ["Hb level (g/dL)",
+                          "How many meals do you eat a day?",
+                          "How often do you eat protein (eg. daal, mung, rajma, chole, chana)?",
+                          "How often do you eat carbohydrates (eg. chapati, rice)?",
+                          "How often do you eat vegetables (eg. gobhi, patta gobhi, saag)?",
+                          "How often do you eat sweets/desserts (eg. gulab jamun)?"]
+
+    fingerstick_RCBG = ["Is patient > 18 years old?",
+                        "Random capillary blood glucose (mg/dL)"]
+
+    blood_pressure = ["Is patient > 18 years old?",
+                      "Systolic BP Reading 1 (mmHg)",
+                      "Diastolic BP Reading 1 (mmHg)",
+                      "Systolic BP Reading 2 (mmHg)",
+                      "Diastolic BP Reading 2 (mmHg)"]
+
+    doctors_consult = ["Urgent doctor's consult: doctor's notes",
+                       "Standard doctor's consult: doctor's notes"]
+
+    for question in registration:
+        insert_question(question, 1, 1)
+
+    for question in oral_health:
+        insert_question(question, 2, 1)
+
+    for question in bmi:
+        insert_question(question, 3, 1)
+
+    for question in eye_screening:
+        insert_question(question, 4, 1)
+
+    for question in phlebotomy:
+        insert_question(question, 5, 1)
+
+    for question in fingerstick_anemia:
+        insert_question(question, 6, 1)
+
+    for question in fingerstick_RCBG:
+        insert_question(question, 7, 1)
+
+    for question in blood_pressure:
+        insert_question(question, 8, 1)
+
+    for question in doctors_consult:
+        insert_question(question, 9, 1)
+
+    # # for patient 1
+    # insert_answer(1, 'Alice', 1, 1)
+    # insert_answer(1, 20, 2, 1)
+
+    # # for patient 2
+    # insert_answer(2, 'Bob', 1, 1)
+    # insert_answer(2, 35, 2, 1)
 
 
 def main():
-    # db_setup()
-    # insert_stations()
-    # insert_type("text")
-    # insert_question("Name", 1, 1)
-    # insert_question("NRIC No.", 1, 1)
+    insert_stuff_test_patch_4()
+    insert_stations()
+    insert_type("text")
 
     # save_questions("question.csv")
     # insert_stuff_test()
@@ -1212,15 +1081,13 @@ def main():
 
     # insert_stuff_test_patch_4()
 
-    create_patient()
-
     # insert_type("text")
     # insert_question("Name", 1, 1)
     # insert_question("NRIC No.", 1, 1)
 
 
 if __name__ == '__main__':
-    # main()
-    app.run(host='0.0.0.0', port=5000)
+    main()
+    # app.run(host='0.0.0.0', port=5000)
 
     # app.run(debug=True)
