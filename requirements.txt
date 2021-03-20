@@ -17,7 +17,7 @@ httplib2==0.18.1
 idna==2.10
 ipaddress==1.0.23
 itsdangerous==1.1.0
-Jinja2==2.11.2
+Jinja2==2.11.3
 keyring==10.6.0
 keyrings.alt==3.0
 MarkupSafe==1.1.1
