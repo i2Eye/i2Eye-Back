@@ -10,7 +10,7 @@ decorator==4.4.2
 elasticsearch==7.6.0
 enum34==1.1.10
 Flask==1.1.2
-Flask-Cors==3.0.8
+Flask-Cors==3.0.9
 future==0.18.2
 futures==3.3.0
 httplib2==0.18.1
